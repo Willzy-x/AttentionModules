@@ -45,6 +45,3 @@ class DoubleAttention2d(nn.Module):
         output = self.dimExtension(output)
 
         return output
-
-def getDoubleAttention(inchannel, outchannel, reduced_dim):
-    return DoubleAttention2d(inchannel, reduced_dim, outchannel)

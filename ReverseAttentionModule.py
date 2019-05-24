@@ -9,5 +9,4 @@ class ReverseAttention2d(nn.Module):
         self.arg = arg
 
     def forward(self, x):
-
-        
+        return output

@@ -163,10 +163,10 @@ class ResidualAttention3d(nn.Module):
             _make_nResidualUnits3d(inchannel, inchannel, 2*r),
             # interpolation(scale_factor=2, mode='bilinear')
             # Up sampling -- 1
-            nn.UpsamplingBilinear3d(scale_factor=2),
+            nn.Upsample(scale_factor=2, mode = 'trilinear'),
             _make_nResidualUnits3d(inchannel, outchannel, r),
             # Up sampling -- 2
-            nn.UpsamplingBilinear3d(scale_factor=2),
+            nn.Upsample(scale_factor=2, mode = 'trilinear'),
             nn.Conv3d(outchannel, outchannel, kernel_size=1, stride=1),
             nn.Conv3d(outchannel, outchannel, kernel_size=1, stride=1),
         )

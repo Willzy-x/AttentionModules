@@ -64,7 +64,7 @@ class DilatedAttention3d(nn.Module):
     def forward(x):
         att = torch.zeros(x.size())
 
-        for i in len(self.dilated_convs)
+        for i in len(self.dilated_convs):
             att += self.dilated_convs[i](x)
 
         if self.dim_change:
@@ -73,6 +73,3 @@ class DilatedAttention3d(nn.Module):
         att = self.softmax(att)
         output = torch.mul(x, att)
         return output
-
-
-        return

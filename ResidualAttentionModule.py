@@ -185,3 +185,19 @@ class ResidualAttention3d(nn.Module):
         output += t_output
 
         return output
+
+def weights_init(m):
+    print(m)
+    classname = m.__class__.__name__
+    print(classname)
+    if classname.find('Conv3d') != -1:
+        nn.init.kaiming_normal_(m.weight)
+        if m.bias is not None:
+            m.bias.data.zero_()
+
+if __name__ == '__main__':
+    resa = ResidualAttention3d(2, 4)
+    resa.apply(weights_init)
+    x = torch.randn(2,2,8,8,8)
+    y = resa(x)
+    print(y.size())

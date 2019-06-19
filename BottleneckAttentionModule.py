@@ -9,7 +9,7 @@ class Flatten(nn.Module):
     """
     def forward(self, x):
         return x.view(x.size(0), -1)
-        
+
 # 2d version
 class ChannelGate2d(nn.Module):
     def __init__(self, gate_channel, reduction_ratio=16, num_layers=1):
@@ -54,7 +54,7 @@ class BAM2d(nn.Module):
         self.spatial_att = SpatialGate2d(gate_channel)
     def forward(self,in_tensor):
         att = 1 + F.sigmoid( self.channel_att(in_tensor) * self.spatial_att(in_tensor) )
-return att * in_tensor
+        return att * in_tensor
 
 # 3d version
 class ChannelGate3d(nn.Module):
@@ -79,6 +79,7 @@ class ChannelGate3d(nn.Module):
         avg_pool = F.avg_pool3d(in_tensor, in_tensor.size(2), stride=in_tensor.size(2))
         # avg_pool: batch, channel, 1, 1, 1
         print(avg_pool.size())
+        # somthing wrong here
         output = (self.gate_c(avg_pool).unsqueeze(2).unsqueeze(3).unsqueeze(4)).expand_as(in_tensor)
 
         return output
@@ -112,6 +113,7 @@ class BAM3d(nn.Module):
         self.spatial_att = SpatialGate3d(gate_channel)
 
     def forward(self, in_tensor):
+        # or here
         att = 1 + F.sigmoid(self.channel_att(in_tensor) * self.spatial_att(in_tensor))
         return att * in_tensor
 

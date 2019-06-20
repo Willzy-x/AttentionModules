@@ -1,55 +1,108 @@
 import torch
+import math
 import torch.nn as nn
 import torch.nn.functional as F
 
-class MLP(nn.Module):
-    """docstring for MLP."""
-    def __init__(self, in_features, hidden_features, out_features):
-        super(MLP, self).__init__()
-        self.fc_in = nn.Linear(in_features, hidden_features)
-        self.fc_out = nn.Linear(hidden_features, out_features)
+class BasicConv(nn.Module):
+    def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1, groups=1, relu=True, bn=True, bias=False):
+        super(BasicConv, self).__init__()
+        self.out_channels = out_planes
+        self.conv = nn.Conv3d(in_planes, out_planes, kernel_size=kernel_size, stride=stride, padding=padding, dilation=dilation, groups=groups, bias=bias)
+        self.bn = nn.BatchNorm3d(out_planes,eps=1e-5, momentum=0.01, affine=True) if bn else None
+        self.relu = nn.ReLU() if relu else None
 
     def forward(self, x):
-        output = self.fc_in(x)
-        output = self.fc_out(output)
-        return output
+        x = self.conv(x)
+        if self.bn is not None:
+            x = self.bn(x)
+        if self.relu is not None:
+            x = self.relu(x)
+        return x
 
-class CBAttenionModule2d(object):
-    """docstring for CBAM2d."""
-    def __init__(self, arg, inchannel, outchannel, h, w):
-        super(CBAttenionModule2d, self).__init__()
-        self.conv1 = nn.Conv2d(inchannel, outchannel, kernel_size=3, stride=2, padding=1)
-
-        self.spatialMaxPool = nn.MaxPool1d(kernel_size=inchannel, stride=1)
-        self.spatialAvgPool = nn.AvgPool1d(kernel_size=inchannel, stride=1)
-        self.conv2 = nn.Conv2d(2, outchannel, kernel_size=3, stride=2, padding=1)
-
-        self.channelMaxPool = nn.MaxPool2d(kernel_size=(h, w), stride=1)
-        self.channelAvgPool = nn.AvgPool2d(kernel_size=(h, w), stride=1)
-        self.mlp = MLP(inchannel, inchannel // 2, inchannel)
-
-        self.sigmoid = torch.sigmoid
-
+class Flatten(nn.Module):
     def forward(self, x):
-        feature = self.conv1(x)
+        return x.view(x.size(0), -1)
 
-        chanMaxPool = self.MaxPool2d(x)
-        chanAvgPool = self.AvgPool2d(x)
-        chanMaxPool = self.mlp(chanMaxPool)
-        chanAvgPool = self.mlp(chanAvgPool)
-        chanAttention = self.sigmoid(chanAvgPool + chanMaxPool)
+class ChannelGate(nn.Module):
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max']):
+        super(ChannelGate, self).__init__()
+        self.gate_channels = gate_channels
+        self.mlp = nn.Sequential(
+            Flatten(),
+            nn.Linear(gate_channels, gate_channels // reduction_ratio),
+            nn.ReLU(),
+            nn.Linear(gate_channels // reduction_ratio, gate_channels)
+            )
+        self.pool_types = pool_types
+    def forward(self, x):
+        channel_att_sum = None
+        for pool_type in self.pool_types:
+            if pool_type=='avg':
+                avg_pool = F.avg_pool3d( x, (x.size(2), x.size(3), x.size(4)), stride=(x.size(2), x.size(3), x.size(4)))
+                channel_att_raw = self.mlp( avg_pool )
+            elif pool_type=='max':
+                max_pool = F.max_pool3d( x, (x.size(2), x.size(3), x.size(4)), stride=(x.size(2), x.size(3), x.size(4)))
+                channel_att_raw = self.mlp( max_pool )
+            elif pool_type=='lp':
+                # lp_pool = F.lp_pool2d( x, 2, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))
+                lp_pool = lp_pool3d(x, 2)
+                channel_att_raw = self.mlp( lp_pool )
+            elif pool_type=='lse':
+                # LSE pool only
+                lse_pool = logsumexp_3d(x)
+                channel_att_raw = self.mlp( lse_pool )
 
-        d, n, h, w = x.size()
-        x = x.permute(0, 2, 3, 1).contiguous().view(d, h*w, -1)
-        spaMaxPool = self.spatialMaxPool(tempx)
-        spaMaxPool = spaMaxPool.view(d, 1, h, w)
-        spaAvgPool = self.spatialAvgPool(tempx)
-        spaAvgPool = spaAvgPool.view(d, 1, h, w)
+            if channel_att_sum is None:
+                channel_att_sum = channel_att_raw
+            else:
+                channel_att_sum = channel_att_sum + channel_att_raw
 
-        spaAttention = torch.concatenate((spaMaxPool, spaAvgPool), dim=1)
-        spaAttention = self.conv2(spaAttention)
-        spaAttention = self.sigmoid(spaAttention)
+        scale = F.sigmoid( channel_att_sum ).unsqueeze(2).unsqueeze(3).unsqueeze(4).expand_as(x)
+        return x * scale
 
-        # spatial attention
-        feature = torch.mul(spaAttention, feature)
-        # channel attention
+def lp_pool3d(tensor, p):
+    tensor_flatten = tensor.view(tensor.size(0), tensor.size(1), -1)
+    s, _ = torch.max(tensor_flatten, dim=2, keepdim=True)
+    outputs = s + torch.pow(torch.pow(tensor_flatten - s, p).sum(dim=2, keepdim=True), 1.0/p)
+    return outputs
+
+def logsumexp_3d(tensor):
+    tensor_flatten = tensor.view(tensor.size(0), tensor.size(1), -1)
+    s, _ = torch.max(tensor_flatten, dim=2, keepdim=True)
+    outputs = s + (tensor_flatten - s).exp().sum(dim=2, keepdim=True).log()
+    return outputs
+
+class ChannelPool(nn.Module):
+    def forward(self, x):
+        return torch.cat( (torch.max(x,1)[0].unsqueeze(1), torch.mean(x,1).unsqueeze(1)), dim=1 )
+
+class SpatialGate(nn.Module):
+    def __init__(self):
+        super(SpatialGate, self).__init__()
+        kernel_size = 7
+        self.compress = ChannelPool()
+        self.spatial = BasicConv(2, 1, kernel_size, stride=1, padding=(kernel_size-1) // 2, relu=False)
+    def forward(self, x):
+        x_compress = self.compress(x)
+        x_out = self.spatial(x_compress)
+        scale = F.sigmoid(x_out) # broadcasting
+        return x * scale
+
+class CBAM3d(nn.Module):
+    def __init__(self, gate_channels, reduction_ratio=16, pool_types=['avg', 'max'], no_spatial=False):
+        super(CBAM3d, self).__init__()
+        self.ChannelGate = ChannelGate(gate_channels, reduction_ratio, pool_types)
+        self.no_spatial=no_spatial
+        if not no_spatial:
+            self.SpatialGate = SpatialGate()
+    def forward(self, x):
+        x_out = self.ChannelGate(x)
+        if not self.no_spatial:
+            x_out = self.SpatialGate(x_out)
+        return x_out
+
+if __name__ == '__main__':
+    cbam = CBAM3d(16, 4)
+    x = torch.randn(2,16,8,8,8)
+    y = cbam(x)
+    print(y.size())

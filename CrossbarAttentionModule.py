@@ -53,20 +53,23 @@ class CrossbarAttention3d(nn.Module):
 
     def forward(self, x):
         b, c, slice, _, _ = x.size()
-        x = x.view(b*slice, c, self.height, self.width).contiguous()
+        x = x.permute(0, 2, 1, 3, 4).contiguous();
+        x = x.view(b*slice, c, self.height, self.width)
+        # calculate as 2D images 
         a_h = self.convH(x)
         size_h = a_h.size()
-        a_h = a_h.view(size_h[0], -1).contiguous()
+        a_h = a_h.view(size_h[0], -1)
 
         a_w = self.convW(x)
         size_w = a_w.size()
-        a_w = a_w.view(size_w[0], -1).contiguous()
+        a_w = a_w.view(size_w[0], -1)
 
         spatial_att = torch.einsum('bi,bj->bij', [a_h, a_w])
         spatial_att = F.softmax(spatial_att, dim=0)
         x = torch.einsum('bij,bcij->bcij', [spatial_att, x])
 
-        x = x.view(b, c, slice, self.height, self.width).contiguous()
+        x = x.view(b, slice, c, self.height, self.width)
+        x = x.permute(0, 2, 1, 3, 4).contiguous();
         '''
         a_h = []
         a_w = []

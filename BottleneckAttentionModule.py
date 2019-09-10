@@ -76,11 +76,15 @@ class ChannelGate3d(nn.Module):
         self.gate_c.add_module('gate_c_fc_final', nn.Linear(gate_channels[-2], gate_channels[-1]))
 
     def forward(self, in_tensor):
-        avg_pool = F.avg_pool3d(in_tensor, in_tensor.size(2), stride=in_tensor.size(2))
+        in_size = in_tensor.size()
+        avg_pool = F.avg_pool3d(in_tensor, (in_size[2], in_size[3], in_size[4]), stride=in_size[2])
         # avg_pool: batch, channel, 1, 1, 1
         print(avg_pool.size())
         # somthing wrong here
-        output = (self.gate_c(avg_pool).unsqueeze(2).unsqueeze(3).unsqueeze(4)).expand_as(in_tensor)
+        output = self.gate_c(avg_pool)
+        print("oirginal", output.size())
+        output = output.unsqueeze(2).unsqueeze(3).unsqueeze(4).expand_as(in_tensor)
+        print("After unsqueeze", output.size())
 
         return output
 
@@ -118,7 +122,7 @@ class BAM3d(nn.Module):
         return att * in_tensor
 
 if __name__ == '__main__':
-    x = torch.randn([2,64, 8,8,8])
+    x = torch.randn([1,64, 2,16,26])
 
     bnet = BAM3d(64)
     y = bnet(x)

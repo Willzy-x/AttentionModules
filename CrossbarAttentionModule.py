@@ -22,12 +22,12 @@ class CrossbarAttention2d(nn.Module):
         a_h = self.convH(x)
         size_h = a_h.size()
         # batch, 1, height, 1
-        a_h = a_h.view(size_h[0], -1).contiguous()
+        a_h = a_h.view(size_h[0], -1)
 
         a_w = self.convW(x)
         size_w = a_w.size()
         # batch, 1, 1, width
-        a_w = a_w.view(size_w[0], -1).contiguous()
+        a_w = a_w.view(size_w[0], -1)
         x = self.conv1(x)
         #print(a_w.size())
         spatial_att = torch.einsum('bi,bj->bij', [a_h, a_w])
@@ -55,7 +55,7 @@ class CrossbarAttention3d(nn.Module):
         b, c, slice, _, _ = x.size()
         x = x.permute(0, 2, 1, 3, 4).contiguous();
         x = x.view(b*slice, c, self.height, self.width)
-        # calculate as 2D images 
+        # calculate as 2D images
         a_h = self.convH(x)
         size_h = a_h.size()
         a_h = a_h.view(size_h[0], -1)
@@ -70,12 +70,7 @@ class CrossbarAttention3d(nn.Module):
 
         x = x.view(b, slice, c, self.height, self.width)
         x = x.permute(0, 2, 1, 3, 4).contiguous();
-        '''
-        a_h = []
-        a_w = []
-        for i in range(slice):
-            a_h.append(self.conv)
-        '''
+
         return x
 
 

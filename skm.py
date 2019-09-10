@@ -12,7 +12,7 @@ class SKM2d(nn.Module):
         self.out_channel = out_channel
         self.eff_d = max(out_channel/reduction_rate, 32)
         for i in kernels:
-            self.convs.append(nn.Sequential(nn.Conv2d(input_channel, out_channel, kernel_size=i, padding=i//2),
+            self.convs.append(nn.Sequential(nn.Conv2d(input_channel, out_channel, kernel_size=i, padding=i//2, groups=input_channel),
                                             nn.BatchNorm2d(out_channel),
                                             nn.ReLU(inplace=True)))
         self.gap = nn.AdaptiveAvgPool2d(1)
@@ -48,7 +48,7 @@ class SKM3d(nn.Module):
         self.out_channel = out_channel
         self.eff_d = max(out_channel/reduction_rate, 32)
         for i in kernels:
-            self.convs.append(nn.Sequential(nn.Conv3d(input_channel, out_channel, kernel_size=i, padding=i//2),
+            self.convs.append(nn.Sequential(nn.Conv3d(input_channel, out_channel, kernel_size=i, padding=i//2, groups=input_channel),
                                             nn.BatchNorm3d(out_channel),
                                             nn.ReLU(inplace=True)))
         self.gap = nn.AdaptiveAvgPool3d(1)

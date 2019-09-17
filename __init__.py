@@ -6,4 +6,5 @@ from AttentionModule.BottleneckAttentionModule import *
 from AttentionModule.PiCAAttentionModule import *
 #__all__ = ['DoubleAttentionModule', 'DecoupledAttentionModule']
 from AttentionModule.CBAttentionModule import CBAM3d
+from skm import *
 # import DoubleAttention2d

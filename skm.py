@@ -77,7 +77,7 @@ class SKM3d(nn.Module):
 
 
 if __name__ == '__main__':
-    sk = SKM3d(32,32,reduction_rate=2)
-    x = torch.randn([2,32,8,8,8])
+    sk = SKM3d(16,16,reduction_rate=2)
+    x = torch.randn([2,16,8,8,8])
     y = sk(x)
     print(y.shape)
